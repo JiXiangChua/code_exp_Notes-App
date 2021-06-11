@@ -72,6 +72,9 @@ export default function NotesScreen({ route, navigation }) {
       const newNote = {
         title: route.params.text,
         done: false,
+        created: firebase.firestore.FieldValue.serverTimestamp(),
+        //alternative
+        //created: Date.now().toString(),
         // id: notes.length.toString(), //not using id line for firestore db since we using the automatically generated ID.
       };
 
@@ -97,6 +100,7 @@ export default function NotesScreen({ route, navigation }) {
     const unsubscribe = firebase
       .firestore()
       .collection("todos")
+      .orderBy("created", "desc")
       .onSnapshot((collection) => {
         //Let's get back a snapshot of this collection
         const updatedNotes = collection.docs.map((doc) => {
