@@ -5,10 +5,13 @@ import {
   View,
   FlatList,
   TouchableOpacity,
+  TouchableHighlightBase,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Entypo, AntDesign } from "@expo/vector-icons";
 import { roundToNearestPixel } from "react-native/Libraries/Utilities/PixelRatio";
 import * as SQLite from "expo-sqlite";
+import { back } from "react-native/Libraries/Animated/src/Easing";
 
 const db = SQLite.openDatabase("notes.db"); //if not exist, it will create one for it
 
@@ -23,7 +26,7 @@ export default function NotesScreen({ route, navigation }) {
     //a function to refresh the notes stored in teh array.
     db.transaction((tx) => {
       tx.executeSql(
-        "SELECT * FROM notes",
+        "SELECT * FROM notes ORDER BY done ASC; ",
         null,
         (txObj, { rows: { _array } }) => setNotes(_array), // a sucess function that contains the results of the query and set the reults into the setNotes useState.
         (txObj, error) => console.log("Error", error)
@@ -96,20 +99,38 @@ export default function NotesScreen({ route, navigation }) {
     );
   }
 
+  function checkedNote(id, done) {
+    db.transaction(
+      (tx) => {
+        if (done == 0) {
+          tx.executeSql(`UPDATE notes set done = 1 where id=${id}`);
+        } else if (done == 1) {
+          tx.executeSql(`UPDATE notes set done = 0 where id=${id}`);
+        }
+      },
+      null,
+      refreshNotes
+    );
+  }
+
   function renderItem({ item }) {
     return (
       <View
-        style={{
-          padding: 10,
-          paddingTop: 20,
-          paddingBottom: 20,
-          borderBottomColor: "#ccc",
-          borderBottomWidth: 1,
-          flexDirection: "row",
-          justifyContent: "space-between",
+        style={item.done ? styles.check : styles.uncheck}
+        onTouchStart={() => {
+          checkedNote(item.id, item.done);
         }}
       >
-        <Text style={{ textAlign: "left", fontSize: 16 }}>{item.title}</Text>
+        {/* <TouchableWithoutFeedback
+          onPress={() => {
+            checkedNote(item.id, item.done);
+          }}
+        > */}
+        <Text style={{ textAlign: "left", fontSize: 16 }}>
+          {item.title},{item.done}
+        </Text>
+        {/* </TouchableWithoutFeedback> */}
+
         <TouchableOpacity onPress={() => deleteNote(item.id)}>
           <AntDesign name="delete" size={24} color="#944" />
         </TouchableOpacity>
@@ -134,5 +155,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffc",
     alignItems: "center",
     justifyContent: "center",
+  },
+  check: {
+    backgroundColor: "lightgrey",
+    padding: 10,
+    paddingTop: 20,
+    paddingBottom: 20,
+    borderBottomColor: "#ccc",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  uncheck: {
+    backgroundColor: "#ffc",
+    padding: 10,
+    paddingTop: 20,
+    paddingBottom: 20,
+    borderBottomColor: "#ccc",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
 });
