@@ -12,6 +12,7 @@ import { Entypo, AntDesign } from "@expo/vector-icons";
 import { roundToNearestPixel } from "react-native/Libraries/Utilities/PixelRatio";
 import * as SQLite from "expo-sqlite";
 import { back } from "react-native/Libraries/Animated/src/Easing";
+import firebase from "../database/firebaseDB";
 
 const db = SQLite.openDatabase("notes.db"); //if not exist, it will create one for it
 
@@ -63,26 +64,58 @@ export default function NotesScreen({ route, navigation }) {
     });
   });
 
+  //Monitor route.params for changes and add items to the database
+
   useEffect(() => {
     if (route.params?.text) {
       //if route.params.text return something, then perfrom the following operations.
-      //   const newNote = {
-      //     title: route.params.text,
-      //     done: false,
-      //     id: notes.length.toString(),
-      //   };
-      //   setNotes([...notes, newNote]); //the 2nd parameter here is if there is a change in this array, then the useEffect() hook will run again.
-      db.transaction(
-        (tx) => {
-          tx.executeSql("Insert into notes (done, title) values (0, ?)", [
-            route.params.text,
-          ]);
-        },
-        null,
-        refreshNotes
-      );
+      const newNote = {
+        title: route.params.text,
+        done: false,
+        // id: notes.length.toString(), //not using id line for firestore db since we using the automatically generated ID.
+      };
+
+      //database
+      firebase.firestore().collection("todos").add(newNote);
+      setNotes([...notes, newNote]); //the 2nd parameter here is if there is a change in this array, then the useEffect() hook will run again.
+
+      // db.transaction(
+      //   (tx) => {
+      //     tx.executeSql("Insert into notes (done, title) values (0, ?)", [
+      //       route.params.text,
+      //     ]);
+      //   },
+      //   null,
+      //   refreshNotes
+      // );
     }
   }, [route.params?.text]);
+
+  //load up firebase database on start.
+  //the snapshot keeps everything synced -- no need to refresh it later!
+  useEffect(() => {
+    const unsubscribe = firebase
+      .firestore()
+      .collection("todos")
+      .onSnapshot((collection) => {
+        //Let's get back a snapshot of this collection
+        const updatedNotes = collection.docs.map((doc) => {
+          //create our own object that pulls the ID into a property
+          const noteObject = {
+            ...doc.data(),
+            id: doc.id,
+          };
+          console.log(noteObject);
+          return noteObject;
+        });
+        setNotes(updatedNotes); //And set our notes state array to its docs
+      });
+
+    //Unsubscribe when unmounting
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   function addNote() {
     navigation.navigate("Add Note");
@@ -97,6 +130,8 @@ export default function NotesScreen({ route, navigation }) {
       null,
       refreshNotes
     );
+    console.log("Deleting", +id);
+    firebase.firestore().collection("todos").doc(id).delete(); // this is much simpler now we have the firestore ID
   }
 
   function checkedNote(id, done) {
@@ -126,9 +161,7 @@ export default function NotesScreen({ route, navigation }) {
             checkedNote(item.id, item.done);
           }}
         > */}
-        <Text style={{ textAlign: "left", fontSize: 16 }}>
-          {item.title},{item.done}
-        </Text>
+        <Text style={{ textAlign: "left", fontSize: 16 }}>{item.title}</Text>
         {/* </TouchableWithoutFeedback> */}
 
         <TouchableOpacity onPress={() => deleteNote(item.id)}>
